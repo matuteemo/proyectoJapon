@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Handwritten Digit Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Style for the generated images to resemble MNIST */
+        .mnist-image {
+            border: 1px solid #4a5568; /* gray-700 */
+            background-color: #000000;
+            width: 112px; /* 4x the standard 28px */
+            height: 112px;
+            image-rendering: pixelated; /* To keep the pixelated look */
+        }
+        /* Spinner animation */
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .spinner {
+            border-width: 4px;
+            border-style: solid;
+            border-color: transparent;
+            border-top-color: #3b82f6; /* blue-500 */
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen">
+    <div class="w-full max-w-2xl mx-auto p-6 md:p-8 bg-gray-800 rounded-xl shadow-2xl">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-white">Handwritten Digit Generator</h1>
+            <p class="text-gray-400 mt-2">Select a digit and click 'Generate' to create five MNIST-style images.</p>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
+            <div class="flex-grow w-full sm:w-auto">
+                <label for="digit-select" class="sr-only">Select a digit</label>
+                <select id="digit-select" class="w-full bg-gray-700 border border-gray-600 text-white text-lg rounded-lg focus:ring-blue-500 focus:border-blue-500 p-3">
+                    <option selected value="0">Digit 0</option>
+                    <option value="1">Digit 1</option>
+                    <option value="2">Digit 2</option>
+                    <option value="3">Digit 3</option>
+                    <option value="4">Digit 4</option>
+                    <option value="5">Digit 5</option>
+                    <option value="6">Digit 6</option>
+                    <option value="7">Digit 7</option>
+                    <option value="8">Digit 8</option>
+                    <option value="9">Digit 9</option>
+                </select>
+            </div>
+            <button id="generate-btn" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg text-lg transition-all duration-300 shadow-lg hover:shadow-blue-500/50">
+                Generate
+            </button>
+        </div>
+
+        <!-- Image Display Area -->
+        <div id="image-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 justify-items-center">
+            <!-- Placeholder for 5 images -->
+            <div id="image-placeholder-0" class="mnist-image flex items-center justify-center bg-gray-900 rounded-lg"><span class="text-gray-500">Empty</span></div>
+            <div id="image-placeholder-1" class="mnist-image flex items-center justify-center bg-gray-900 rounded-lg"><span class="text-gray-500">Empty</span></div>
+            <div id="image-placeholder-2" class="mnist-image flex items-center justify-center bg-gray-900 rounded-lg"><span class="text-gray-500">Empty</span></div>
+            <div id="image-placeholder-3" class="mnist-image flex items-center justify-center bg-gray-900 rounded-lg"><span class="text-gray-500">Empty</span></div>
+            <div id="image-placeholder-4" class="mnist-image flex items-center justify-center bg-gray-900 rounded-lg"><span class="text-gray-500">Empty</span></div>
+        </div>
+        
+        <!-- Error Message Box -->
+        <div id="error-box" class="hidden mt-6 p-4 bg-red-900 border border-red-700 text-red-300 rounded-lg text-center">
+            <p id="error-message"></p>
+        </div>
+    </div>
+
+    <script>
+        const generateBtn = document.getElementById('generate-btn');
+        const digitSelect = document.getElementById('digit-select');
+        const imageContainer = document.getElementById('image-container');
+        const errorBox = document.getElementById('error-box');
+        const errorMessage = document.getElementById('error-message');
+
+        generateBtn.addEventListener('click', generateImages);
+
+        async function generateImages() {
+            const selectedDigit = digitSelect.value;
+            const promptText = `A single handwritten digit '${selectedDigit}', centered. The style is exactly like the MNIST dataset: a 28x28 grayscale image with a black background (value 0) and white foreground (the digit, value 255). The digit should be clear and distinct.`;
+            
+            // Disable button and show loading state
+            generateBtn.disabled = true;
+            generateBtn.textContent = 'Generating...';
+            errorBox.classList.add('hidden');
+
+            // Reset image containers to show spinners
+            for (let i = 0; i < 5; i++) {
+                const placeholder = document.getElementById(`image-placeholder-${i}`);
+                placeholder.innerHTML = '<div class="spinner"></div>';
+                placeholder.className = 'mnist-image flex items-center justify-center bg-gray-900 rounded-lg';
+            }
+            
+            try {
+                // Generate images sequentially to avoid potential concurrency issues
+                for (let i = 0; i < 5; i++) {
+                    await callImageGenerationApi(promptText, i);
+                }
+            } catch (error) {
+                console.error("An error occurred during sequential image generation:", error);
+                showError("A critical error occurred. Please check the console for details.");
+            } finally {
+                // Re-enable the button
+                generateBtn.disabled = false;
+                generateBtn.textContent = 'Generate';
+            }
+        }
+        
+        async function callImageGenerationApi(prompt, index) {
+            const placeholder = document.getElementById(`image-placeholder-${index}`);
+            try {
+                const payload = { 
+                    instances: { prompt: prompt }, 
+                    parameters: { "sampleCount": 1 } 
+                };
+                const apiKey = ""; // API key is handled by the environment
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`;
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    let errorDetails = `API request failed with status ${response.status}`;
+                    try {
+                        const errorData = await response.json();
+                        errorDetails += `: ${errorData?.error?.message || JSON.stringify(errorData)}`;
+                    } catch (e) {
+                        console.log("Could not parse error response as JSON.");
+                    }
+                    throw new Error(errorDetails);
+                }
+
+                const result = await response.json();
+
+                if (result.predictions && result.predictions.length > 0 && result.predictions[0].bytesBase64Encoded) {
+                    const imageUrl = `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
+                    const img = document.createElement('img');
+                    img.src = imageUrl;
+                    img.alt = `Generated handwritten digit`;
+                    img.className = 'mnist-image rounded-lg object-cover';
+                    placeholder.innerHTML = ''; // Clear spinner
+                    placeholder.appendChild(img);
+                } else {
+                    throw new Error('Invalid response structure from API.');
+                }
+            } catch (error) {
+                console.error(`Error generating image ${index}:`, error);
+                placeholder.innerHTML = `<span class="text-red-400 text-xs p-1 text-center">Failed: ${error.message}</span>`;
+                showError(`Error on image ${index + 1}. See details in the image box and console.`);
+                // We re-throw the error to stop the sequence in generateImages
+                throw error;
+            }
+        }
+        
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorBox.classList.remove('hidden');
+        }
+
+    </script>
+</body>
+</html>
